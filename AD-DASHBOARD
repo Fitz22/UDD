@@ -1,0 +1,201 @@
+Get-Module UniversalDashboard.Community
+Import-Module ActiveDirectory
+
+$theme = Get-UDTheme Blue #Azure,DarkDefault,DarkRounded,Default,Earth,Green,Red
+
+$Schedule = New-UDEndpointSchedule -Every 1 -Hour
+
+$ADUsertotal = New-UDEndpoint -Schedule $Schedule -Endpoint {
+    $Cache:ADUsertotal = (Get-ADUser -filter *).count | ConvertTo-Json
+}
+$ADUserenabled = New-UDEndpoint -Schedule $Schedule -Endpoint {
+    $Cache:ADUserenabled = (Get-ADUser -filter {Enabled -eq $true}).count | ConvertTo-Json
+}
+$ADUserdisabled = New-UDEndpoint -Schedule $Schedule -Endpoint {
+    $Cache:ADUserdisabled = (Get-ADUser -filter {Enabled -eq $false}).count | ConvertTo-Json
+}
+$ADPasswordNeverExpires = New-UDEndpoint -Schedule $Schedule -Endpoint {
+    $Cache:ADPasswordNeverExpires = (Get-ADUser -filter {PasswordNeverExpires -eq $true}).count | ConvertTo-Json
+}
+
+$Dashboard = New-UDDashboard -Theme $theme -Title "AD Dashbord" -Pages @($Summary, $Page1, $Page2, $Page3, $Page4) 
+                      
+
+######################## SUMMARY ########################
+
+$Summary= New-UDPage -Name "Summary" -Icon address_book -Content {
+    New-UDLayout -Columns 5 -Content {
+
+        New-UDCard -Title "AD Computers Infos" -Content {
+            New-UDButton -Text "Scan" -OnClick {
+                Invoke-UDRedirect -Url '../AD-Computers-Infos'
+                }
+        }
+
+        New-UDCard -Title "AD User Infos" -Content {
+            New-UDButton -Text "Scan" -OnClick {
+                Invoke-UDRedirect -Url '../AD-Users-Infos'
+                }
+        }
+
+        New-UDCard -BackgroundColor grey -Title "AD Health (Comming Soon)" -Content {
+            New-UDButton -Text "Go" -OnClick {
+                Invoke-UDRedirect -Url '../AD-Health'
+                }
+        }
+
+        New-UDCard -Horizontal  -BackgroundColor grey -Title "AD Management (Comming Soon)" -Content {
+            New-UDButton -Text "Users" -OnClick {
+                Invoke-UDRedirect -Url '../AD-Management'}
+            New-UDButton -Text "Computers"
+            New-UDButton -Text "Servers"
+            }
+        }
+
+    New-UDButton -Text "show" -Floating -OnClick{
+        New-UDGrid -Headers @("name", "age") -Properties @("name", "age") -Endpoint {
+        get-name-and-age-for-exemple | Select name,age | Out-UDGridData
+        }
+    }
+} 
+
+######################## AD COMPUTERS ########################
+ 
+$Page1 = New-UDPage -Name "AD-Computers-Infos" -Icon home -Content {    
+
+    New-UDLayout -Columns 3 -Content {
+
+        New-UDCard -Title "Computers with last Logon date older than 1 year" -Content {
+            New-UDGrid -Headers @("Name", "LastLogonDate") -Properties @("name", "LastLogonDate") -Endpoint {
+                $oneyear = (Get-Date).AddDays(-365)
+                Get-ADComputer -Filter {LastLogonDate -lt $oneyear -and enabled -eq "True"} -Properties Name, LastLogonDate, enabled | Select name,*lastlogon*, enabled | Out-UDGridData
+
+            }
+        }
+
+    }
+
+    New-UDRow -Columns {
+        New-UDColumn -Size 12 -Content {
+            New-UDCard -Title "AD Computers" -Content {
+                New-UDGrid -PageSize 100 -Title "Computer list" -Headers @("Name", "IPV4", "OperatingSystem", "OperatingSystemServicePack", "Enabled") -Properties @("name", "IPv4Address", "OperatingSystem", "OperatingSystemServicePack", "Enabled")  -Endpoint {
+                    Get-ADComputer -Filter * -Properties ipv4Address, OperatingSystem, OperatingSystemServicePack, Enabled | Select name, ipv4*, oper*, Enabled | Out-UDGridData
+                }
+            }
+        }
+    }
+}
+
+######################## AD USERS ########################
+
+$Page2 = New-UDPage -Name "AD-Users-Infos" -Icon users -Content { 
+    New-UDHeading -Size 3 -Content { New-UDCard -BackgroundColor "#1D7FD6" -Content { "AD USERS INFORMATIONS" }}
+    
+        ############### Total User AD
+
+$Schedule = New-UDEndpointSchedule -Every 1 -Hour
+
+$ADUsertotal = New-UDEndpoint -Schedule $Schedule -Endpoint {
+    $Cache:ADUsertotal = (Get-ADUser -filter *).count | ConvertTo-Json
+}
+$ADUserenabled = New-UDEndpoint -Schedule $Schedule -Endpoint {
+    $Cache:ADUserenabled = (Get-ADUser -filter {Enabled -eq $true}).count | ConvertTo-Json
+}
+$ADUserdisabled = New-UDEndpoint -Schedule $Schedule -Endpoint {
+    $Cache:ADUserdisabled = (Get-ADUser -filter {Enabled -eq $false}).count | ConvertTo-Json
+}
+$ADPasswordNeverExpires = New-UDEndpoint -Schedule $Schedule -Endpoint {
+    $Cache:ADPasswordNeverExpires = (Get-ADUser -filter {PasswordNeverExpires -eq $true}).count | ConvertTo-Json
+}
+
+New-UDLayout -Columns 4 -Content {
+
+        ############### Total User AD
+        
+        New-UDCounter -BackgroundColor "#1D7FD6" -Title "Total User AD" -Icon user -Endpoint {
+			$Cache:ADUsertotal
+		    } -AutoRefresh -RefreshInterval 1
+
+        ############### Total User AD enabled
+
+        New-UDCounter -BackgroundColor "#1DA9D6" -Title "Total User AD enabled" -Icon user -Endpoint {
+			$Cache:ADUserenabled
+		    } -AutoRefresh -RefreshInterval 1
+
+        ############### Total User AD disabled
+
+        New-UDCounter -BackgroundColor grey -Title "Total User AD disabled" -Icon user -Endpoint {
+			$Cache:ADUserdisabled
+		    } -AutoRefresh -RefreshInterval 1
+
+        ############### Total User AD whit Password never expires
+
+        New-UDCounter -BackgroundColor "#1DD6A4" -Title "Password never expires" -Icon user -Endpoint {
+            $Cache:ADPasswordNeverExpires
+        } -AutoRefresh -RefreshInterval 1
+
+    }
+############### Search user in AD ###############
+
+    New-UDRow -Columns {
+        New-UDColumn -Size 5 -Content {
+                New-UDGrid -PageSize 20 -Title "Users Infos" -Headers @("UserPrincipalName", "mail", "Enabled") -Properties @("UserPrincipalName", "mail", "Enabled")  -Endpoint {
+                    get-aduser -Filter * -Properties UserPrincipalName, Enabled, mail | where UserPrincipalName -ne $null|  select -Property UserPrincipalName, Enabled, mail | Out-UDGridData
+                }
+        }
+
+############### Info sur le passwords des USERS AD Actifs et leur dernière connexion ###############
+
+        New-UDColumn -Size 7 -Content {
+            #New-UDCard -Title "AD User Passwords Informations" -Content {  , "lastLogon" 
+                New-UDGrid -BackgroundColor "#1D7FD6"  -PageSize 20 -Title "Info sur le passwords des USERS AD Actifs et leur dernière connexion" -Headers @("Displayname","Pswd Expired","ExpiryDate","lastLogon","passwordlastset") -Properties @("Displayname" , "PasswordExpired" , "ExpiryDate" , "lastLogon" , "passwordlastset")  -Endpoint {
+                    Get-ADUser -filter {Enabled -eq $True -and PasswordNeverExpires -eq $False} –Properties "Displayname", "passwordlastset" , "PasswordExpired" , "lastLogon" , "PasswordNeverExpires", "msDS-UserPasswordExpiryTimeComputed", "Enabled" |
+                    Select-Object -Property "Displayname", "passwordlastset" , "PasswordExpired", "PasswordNeverExpires", "Enabled", `
+	                @{Name="lastLogon";Expression={[datetime]::FromFileTimeUtc($_.'lastLogon')}}, `
+	                @{Name="ExpiryDate";Expression={[datetime]::FromFileTime($_."msDS-UserPasswordExpiryTimeComputed")}} |
+	                out-UDGridData
+                }
+            #}
+        }
+    }
+}
+
+######################## AD Health ########################
+
+$Page3 = New-UDPage -Name "AD-Health" -Icon heart -Content {
+    
+    New-UDRow -Columns {
+        New-UDColumn -Size 12 -Content {
+            New-UDLayout -Columns 5 -Content {
+                New-UDCard -Title "AD Users" -Content{
+                    New-UdMonitor -Title "CPU (% processor time)" -Type Line -Endpoint {
+                    Get-Counter '\Processor(_Total)\% Processor Time' | Out-UDMonitorData
+                    }
+                }
+            }
+        }
+    }                     
+}
+
+######################## AD MANAGEMENT ########################
+
+$Page4 = New-UDPage -Name "AD-Management" -Icon toolbox -Content {
+    
+    New-UDLayout -Columns 5 -Content {
+        New-UDCard -Title "AD Users" -Content{
+            New-UDInput -Title "User Name" -Endpoint {
+                param($Name, [bool]$Yes)
+
+                   if ($Yes) {
+                   New-UDInputAction -Toast "Yes, $Name"
+                   } else {
+                   New-UDInputAction -Toast "No, $Name"
+                   }
+            }
+        }
+    }        
+}
+
+
+Start-UDDashboard -Port 10001 -Dashboard $Dashboard -name "AD_DashBoard" -Endpoint @($ADUsertotal, $ADUserenabled, $ADUserdisabled, $ADPasswordNeverExpires)
+
